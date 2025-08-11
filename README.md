@@ -1,5 +1,6 @@
 Design Doc: https://app.eraser.io/workspace/51LJBr86c4kcQaaVYSAq?origin=share
-TODO:
+
+**TODOs**:
 - [x] Implement repo initialization
 - [x] Hash blob to store in .git/objects/
 - [ ] Hash tree to store in .git/objects/
