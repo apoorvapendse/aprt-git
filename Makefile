@@ -1,3 +1,27 @@
-all:
-	gcc main.c
-	./a.out
+# Compiler
+CXX = g++
+
+# Compiler flags
+CXXFLAGS = -ggdb -Wall
+
+# Libraries
+LIBS = -lssl -lcrypto
+
+# Source and output
+SRC = main.cpp
+OUT = a.out
+
+# Default target
+all: $(OUT)
+
+# Build rule
+$(OUT): $(SRC)
+	$(CXX) $(CXXFLAGS) $(SRC) $(LIBS) -o $(OUT)
+
+# Run target
+run: $(OUT)
+	./$(OUT)
+
+# Clean target
+clean:
+	rm -f $(OUT)
