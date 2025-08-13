@@ -9,29 +9,33 @@ namespace fs = std::filesystem;
 
 class GitRepo {
   public:
+  fs::path repo_path;
+  fs::path git_path;
+  
     GitRepo(const std::string &basePath = ".") {
-        fs::path aprtPath = fs::path(basePath) / ".aprt-git";
+        this->repo_path = fs::path(basePath);
+        this->git_path = repo_path / ".aprt-git";
 
-        if (fs::exists(aprtPath)) {
-            std::cout << aprtPath << " already exists.\n";
+        if (fs::exists(git_path)) {
+            std::cout << git_path << " already exists.\n";
             return;
         }
 
         // Create main directory
-        fs::create_directories(aprtPath);
+        fs::create_directories(git_path);
 
         // Create subdirectories
-        fs::create_directories(aprtPath / "objects");
-        fs::create_directories(aprtPath / "refs" / "heads");
-        fs::create_directories(aprtPath / "refs" / "tags");
+        fs::create_directories(git_path / "objects");
+        fs::create_directories(git_path / "refs" / "heads");
+        fs::create_directories(git_path / "refs" / "tags");
 
         // Create HEAD file
         {
-            std::ofstream headFile(aprtPath / "HEAD");
+            std::ofstream headFile(git_path / "HEAD");
             headFile << "ref: refs/heads/master\n";
         }
 
-        std::cout << ".aprt-git repository initialized in " << aprtPath << "\n";
+        std::cout << ".aprt-git repository initialized in " << git_path << std::endl;
     }
 };
 
@@ -77,6 +81,10 @@ void save_blob(const std::string& file_path) {
         std::cout << "Stored object: " << fullPath << "\n";   
     
 }
+
+// create a tree object
+// create recusively tree for each dir in repo
+// save tree object
 
 int main() {
     GitRepo repo;
