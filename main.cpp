@@ -4,6 +4,7 @@
 #include <openssl/sha.h>
 #include <sstream>
 #include <vector>
+#include<bool
 
 namespace fs = std::filesystem;
 
@@ -36,6 +37,69 @@ class GitRepo {
         }
 
         std::cout << ".aprt-git repository initialized in " << git_path << std::endl;
+    }
+
+    std::string hash_from_root(fs::path path = {}){
+        if(path.empty()) {
+            path = this->repo_path;
+        }
+        // TODO: 
+        // 1. Don't hash if not staged, add check for this
+        // 2. 
+        std::vector<Entry> entries;
+        for (const auto& entry : fs::directory_iterator(path)) {
+            if (entry.is_directory()) {
+                std::string dir_hash = hash_from_root(entry.path());
+                if(dir_hash = "nothing changed"){
+                    continue;
+                }
+                Entry dir_entry = generate_tree_entry(entry, dir_hash);
+                entries.push_back(dir_entry);
+            } else if (entry.is_regular_file()) {
+                std::ifstream file(entry.path(), std::ios::binary);
+                std::ostringstream ss;
+                ss << file.rdbuf();
+                std::string content = ss.str();
+
+                std::hash<std::string> hash_fn{};
+                std::string file_hash = std::to_string(hash_fn(content));
+                if(check_hash_exists_already(file_hash)){
+                    continue;
+                }
+                Entry file_entry = generate_tree_entry(entry, file_hash);
+                entries.push_back(file_entry);
+            }
+        }
+        // TODO:
+        // Hash this entry file and save it if not present
+        // if hash_from_root(root) returns a hash that already exists, `nothing to commit, working tree clean`
+        std::string final_tree_object_content = "";
+        if(entries.size() == 0)return "nothing changed";
+        for(const auto& e : entries){
+            if(e.type == "blob"){
+               std::string blob_entry = "";
+               blob_entry += std::to_string(e.perms) + " ";  
+               blob_entry += e.type + " ";
+               blob_entry += e.hash + " ";
+               blob_entry += e.name + "\n";
+               final_tree_object_content += blob_entry;
+            }else{
+               std::string tree_entry = "";
+               tree_entry += std::to_string(e.perms) + " ";  
+               tree_entry += e.type + " ";
+               tree_entry += e.hash + " ";
+               tree_entry += e.name + "\n";
+               final_tree_object_content += tree_entry;
+            }
+        }
+        // if this hash already exists, return something that denotes nothing changed here.
+        if(check_hash_exists_already(get_hash_from_content(final_tree_object_content))){
+            return "nothing changed";
+        }
+    }
+
+    std::bool check_hash_exists_already(std::string hash){
+        std::string object_dir = hash.substr(0,2);
     }
 };
 
@@ -87,6 +151,13 @@ class GitTree: public GitObject {
 };
 
 class Entry {
+    /*
+        // Tree entry for a given tree
+        $ git cat-file bfeea50af3c3c263cb48d8e6356cb737adc61a8e -p
+        100644 blob e7592a092e69d55f97ffa05eff9114e66e351d77    README.txt
+        100644 blob e7592a092e69d55f97ffa05eff9114e66e351d77    copy.txt
+        040000 tree 9e377827cb1253aadc6efba776fc29dd329a704f    test
+    */
 public:
     int perms;
     std::string hash;
@@ -107,7 +178,8 @@ public:
     }
 };
 
-Entry generate_tree_entry(const fs::directory_entry &child) {
+// helper to generate entry content for a given child.
+Entry generate_tree_entry(const fs::directory_entry &child, std::string entry_hash) {
     int perms;
     std::string type;
     std::string hash;
@@ -116,14 +188,6 @@ Entry generate_tree_entry(const fs::directory_entry &child) {
         perms = 0100644;      // typical blob file permissions
         type = "blob";
 
-        // compute hash of file contents (placeholder here)
-        std::ifstream file(child.path(), std::ios::binary);
-        std::ostringstream ss;
-        ss << file.rdbuf();
-        std::string content = ss.str();
-
-        // For now, use content as "hash"; in real Git, you would SHA-1 it
-        hash = std::to_string(std::hash<std::string>{}(content));
     } else if (child.is_directory()) {
         perms = 040000;       // tree directory permissions in octal
         type = "tree";
@@ -138,10 +202,6 @@ Entry generate_tree_entry(const fs::directory_entry &child) {
     return Entry(perms, hash, type, name);
 }
 
-
-// class GitObjectStore {
-    
-// }
 
 std::string sha1_file(const std::string& filePath) {
     unsigned char hash[SHA_DIGEST_LENGTH];
@@ -183,7 +243,6 @@ void save_blob(const std::string& file_path) {
         dst << src.rdbuf();
     
         std::cout << "Stored object: " << fullPath << "\n";   
-    
 }
 
 // create a tree object
