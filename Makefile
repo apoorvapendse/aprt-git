@@ -25,3 +25,6 @@ run: $(OUT)
 # Clean target
 clean:
 	rm -f $(OUT)
+
+
+# TODO: add a target that cleans test dir .git
