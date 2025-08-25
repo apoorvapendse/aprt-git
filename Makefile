@@ -28,3 +28,5 @@ clean:
 
 
 # TODO: add a target that cleans test dir .git
+clean_objects:
+	rm -rf ./test/.aprt-git

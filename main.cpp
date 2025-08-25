@@ -82,7 +82,7 @@ class GitRepo {
         // Create HEAD file
         {
             std::ofstream headFile(git_path / "HEAD");
-            headFile << "ref: refs/heads/master\n";
+            headFile << "";
         }
 
         std::cout << ".aprt-git repository initialized in " << git_path << std::endl;
@@ -236,6 +236,59 @@ class GitRepo {
 
         return oss.str();       
     }
+
+    /*
+        tree d906209d7ed2121a398d675ff840a05d12c5661f
+        parent 85a48f686c2b9a841e01d5caf219bb726b423719
+        author apoorvapendse <apoorvavpendse@gmail.com> 1756058996 +0530
+        committer apoorvapendse <apoorvavpendse@gmail.com> 1756058996 +0530
+
+        Store tree/blob objects on disk
+
+        Signed-off-by: apoorvapendse <apoorvavpendse@gmail.com>
+    */
+    void commit(std::string author, std::string committer, std::string commit_message){
+        std::string root_tree_hash = hash_from_root();
+        if(root_tree_hash == "nothing changed"){
+            std::cout << "nothing to commit, working tree clean.";
+            return;
+        }
+
+        std::string commit_content = "";
+        std::string parent_hash = read_hash_from_head();
+        commit_content += "tree " + root_tree_hash + "\n";
+        if(parent_hash.size() != 0) {
+            commit_content += "parent " + parent_hash + "\n";
+        }
+        commit_content += "author " + author + "\n";
+        commit_content += "committer " + committer + "\n\n";
+        commit_content += commit_message;
+
+        save_hash_from_content(commit_content);
+        std::string commit_hash = get_hash_from_content(commit_content);
+        // TODO: Save this commit_hash in HEAD. Think about interactive rebase 🤯
+        write_commit_hash_to_head_file(commit_hash);
+    }
+    void write_commit_hash_to_head_file(std::string hash) {
+        // TODO: Store ref when it is implemented instead of storing hash directly in HEAD
+        std::ofstream head_file(git_path / "HEAD");
+        if (!head_file.is_open()) {
+            throw std::runtime_error("could not open HEAD file");
+        }
+        head_file << hash;
+    }
+
+    std::string read_hash_from_head(){
+        std::ifstream head_file(git_path / "HEAD");
+        if (!head_file.is_open()) {
+            std::cerr << "Failed to open file!" << std::endl;
+            return "";
+        }
+        std::string hash;
+        std::getline(head_file, hash);
+
+        return hash;
+    }
 };
 
 class GitObject {
@@ -294,7 +347,7 @@ class GitTree: public GitObject {
 int main() {
     GitRepo repo("/home/apoorva/programming/aprt-git/test");
     std::cout << "---------------------------------------" << std::endl;
-    std::cout << repo.hash_from_root() << std::endl;
+    repo.commit("apoorvapendse", "rajeevtapadia", "Is this the real life\nIs this just fantasy");
 
     // std::cout<<sha1File("./README.md")<<std::endl;
     // std::cout << repo.get_hash_from_content("Hello world") << std::endl;

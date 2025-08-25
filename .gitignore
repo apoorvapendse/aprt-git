@@ -1,2 +1,4 @@
 *.out
 .aprt-git/
+.vscode/
+bin
