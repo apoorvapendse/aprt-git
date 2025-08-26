@@ -3,6 +3,7 @@
 #include <iostream>
 #include <openssl/sha.h>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -15,19 +16,18 @@ class Entry {
         100644 blob e7592a092e69d55f97ffa05eff9114e66e351d77    copy.txt
         040000 tree 9e377827cb1253aadc6efba776fc29dd329a704f    test
     */
-public:
+  public:
     int perms;
     std::string hash;
     std::string type;
     std::string name;
 
-    Entry(int perms, const std::string &hash, const std::string &type, const std::string &name) 
-        : perms(perms), hash(hash), type(type), name(name)
-    {}
+    Entry(int perms, const std::string &hash, const std::string &type, const std::string &name)
+        : perms(perms), hash(hash), type(type), name(name) {}
 
     std::string toString() const {
         std::ostringstream ss;
-        ss << std::oct << perms << " ";   // permissions in octal
+        ss << std::oct << perms << " "; // permissions in octal
         ss << type << " ";
         ss << hash << "\t";
         ss << name;
@@ -42,14 +42,14 @@ Entry generate_tree_entry(const fs::directory_entry &child, std::string entry_ha
     std::string hash;
 
     if (child.is_regular_file()) {
-        perms = 0100644;      // typical blob file permissions
+        perms = 0100644; // typical blob file permissions
         type = "blob";
         hash = entry_hash;
     } else if (child.is_directory()) {
-        perms = 040000;       // tree directory permissions in octal
+        perms = 040000; // tree directory permissions in octal
         type = "tree";
         // For directories, compute tree hash recursively or placeholder
-        hash = entry_hash;  // replace with actual tree hash logic
+        hash = entry_hash; // replace with actual tree hash logic
     } else {
         throw std::runtime_error("Unsupported file type: " + child.path().string());
     }
@@ -59,9 +59,10 @@ Entry generate_tree_entry(const fs::directory_entry &child, std::string entry_ha
 }
 class GitRepo {
   public:
-  fs::path repo_path;
-  fs::path git_path;
-  
+    fs::path repo_path;
+    fs::path git_path;
+    std::string index_content;
+
     GitRepo(const std::string &basePath = ".") {
         this->repo_path = fs::path(basePath);
         this->git_path = repo_path / ".aprt-git";
@@ -85,10 +86,12 @@ class GitRepo {
             headFile << "";
         }
 
+        // TODO: load index file into string index_content
+
         std::cout << ".aprt-git repository initialized in " << git_path << std::endl;
     }
 
-    std::string sha1_file(const std::string& filePath) {
+    std::string sha1_file(const std::string &filePath) {
         unsigned char hash[SHA_DIGEST_LENGTH];
         SHA_CTX shaCtx;
         SHA1_Init(&shaCtx);
@@ -108,65 +111,65 @@ class GitRepo {
         return oss.str();
     }
 
-    void save_blob(const std::string& file_path) {
+    void save_blob(const std::string &file_path) {
         std::string hash = sha1_file(file_path);
-    
+
         std::string dir = git_path / "objects" / hash.substr(0, 2);
         std::string filename = hash.substr(2);
-    
+
         fs::create_directories(dir);
-    
+
         std::string fullPath = dir + "/" + filename;
         if (fs::exists(fullPath)) {
             std::cout << "Object already exists: " << fullPath << "\n";
             return;
         }
-    
+
         std::ifstream src(file_path, std::ios::binary);
         std::ofstream dst(fullPath, std::ios::binary);
         // TODO: add compression
         dst << src.rdbuf();
-    
-        std::cout << "Stored object: " << fullPath << "\n";   
+
+        std::cout << "Stored object: " << fullPath << "\n";
     }
 
     void save_hash_from_content(std::string content) {
         std::string hash = get_hash_from_content(content);
         std::string dir = git_path / "objects" / hash.substr(0, 2);
         std::string filename = hash.substr(2);
-    
+
         fs::create_directories(dir);
-    
+
         std::string fullPath = dir + "/" + filename;
         if (fs::exists(fullPath)) {
             std::cout << "Object already exists: " << fullPath << "\n";
             return;
         }
-    
+
         std::ofstream dst(fullPath, std::ios::binary);
         // TODO: add compression
         dst << content;
-    
-        std::cout << "Stored object: " << fullPath << "\n";   
+
+        std::cout << "Stored object: " << fullPath << "\n";
     }
 
-    std::string hash_from_root(fs::path path = {}){
-        if(path.empty()) {
+    std::string hash_from_root(fs::path path = {}) {
+        if (path.empty()) {
             path = this->repo_path;
         }
         std::cout << path << std::endl;
-        std::cout << repo_path/ ".aprt-git" << std::endl;
-        if(path.is_absolute() && path  == repo_path / ".aprt-git"){
+        std::cout << repo_path / ".aprt-git" << std::endl;
+        if (path.is_absolute() && path == repo_path / ".aprt-git") {
             return "nothing changed";
         }
-        // TODO: 
+        // TODO:
         // 1. Don't hash if not staged, add check for this
-        // 2. 
+        // 2.
         std::vector<Entry> entries;
-        for (const auto& entry : fs::directory_iterator(path)) {
+        for (const auto &entry : fs::directory_iterator(path)) {
             if (entry.is_directory()) {
                 std::string dir_hash = hash_from_root(entry.path());
-                if(dir_hash == "nothing changed"){
+                if (dir_hash == "nothing changed") {
                     continue;
                 }
                 Entry dir_entry = generate_tree_entry(entry, dir_hash);
@@ -178,7 +181,7 @@ class GitRepo {
                 std::string content = ss.str();
 
                 std::string file_hash = get_hash_from_content(content);
-                if(check_hash_exists_already(file_hash)){
+                if (check_hash_exists_already(file_hash)) {
                     continue;
                 }
                 std::cout << "Saving blob:" << entry.path() << std::endl;
@@ -191,50 +194,51 @@ class GitRepo {
         // Hash this entry file and save it if not present
         // if hash_from_root(root) returns a hash that already exists, `nothing to commit, working tree clean`
         std::string final_tree_object_content = "";
-        if(entries.size() == 0)return "nothing changed";
-        for(const auto& e : entries){
-            if(e.type == "blob"){
-               std::string blob_entry = "";
-               blob_entry += std::to_string(e.perms) + " ";  
-               blob_entry += e.type + " ";
-               blob_entry += e.hash + " ";
-               blob_entry += e.name + "\n";
-               final_tree_object_content += blob_entry;
-            }else{
-               std::string tree_entry = "";
-               tree_entry += std::to_string(e.perms) + " ";  
-               tree_entry += e.type + " ";
-               tree_entry += e.hash + " ";
-               tree_entry += e.name + "\n";
-               final_tree_object_content += tree_entry;
+        if (entries.size() == 0)
+            return "nothing changed";
+        for (const auto &e : entries) {
+            if (e.type == "blob") {
+                std::string blob_entry = "";
+                blob_entry += std::to_string(e.perms) + " ";
+                blob_entry += e.type + " ";
+                blob_entry += e.hash + " ";
+                blob_entry += e.name + "\n";
+                final_tree_object_content += blob_entry;
+            } else {
+                std::string tree_entry = "";
+                tree_entry += std::to_string(e.perms) + " ";
+                tree_entry += e.type + " ";
+                tree_entry += e.hash + " ";
+                tree_entry += e.name + "\n";
+                final_tree_object_content += tree_entry;
             }
         }
         // if this hash already exists, return something that denotes nothing changed here.
-        if(check_hash_exists_already(get_hash_from_content(final_tree_object_content))){
+        if (check_hash_exists_already(get_hash_from_content(final_tree_object_content))) {
             return "nothing changed";
         }
-        
+
         save_hash_from_content(final_tree_object_content);
         return get_hash_from_content(final_tree_object_content);
     }
 
-    bool check_hash_exists_already(std::string hash){
-        std::string object_dir = hash.substr(0,2);
+    bool check_hash_exists_already(std::string hash) {
+        std::string object_dir = hash.substr(0, 2);
         std::string object_file_name = hash.substr(2);
         fs::path object_path = git_path / "objects" / object_dir / object_file_name;
         return fs::exists(object_path);
     }
 
-    std::string get_hash_from_content(std::string content){
+    std::string get_hash_from_content(std::string content) {
         unsigned char hash[SHA_DIGEST_LENGTH]; // SHA1 produces 20 bytes
-        SHA1(reinterpret_cast<const unsigned char*>(content.c_str()), content.size(), hash);
+        SHA1(reinterpret_cast<const unsigned char *>(content.c_str()), content.size(), hash);
 
         std::ostringstream oss;
         for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
             oss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
         }
 
-        return oss.str();       
+        return oss.str();
     }
 
     /*
@@ -247,9 +251,9 @@ class GitRepo {
 
         Signed-off-by: apoorvapendse <apoorvavpendse@gmail.com>
     */
-    void commit(std::string author, std::string committer, std::string commit_message){
+    void commit(std::string author, std::string committer, std::string commit_message) {
         std::string root_tree_hash = hash_from_root();
-        if(root_tree_hash == "nothing changed"){
+        if (root_tree_hash == "nothing changed") {
             std::cout << "nothing to commit, working tree clean.";
             return;
         }
@@ -257,7 +261,7 @@ class GitRepo {
         std::string commit_content = "";
         std::string parent_hash = read_hash_from_head();
         commit_content += "tree " + root_tree_hash + "\n";
-        if(parent_hash.size() != 0) {
+        if (parent_hash.size() != 0) {
             commit_content += "parent " + parent_hash + "\n";
         }
         commit_content += "author " + author + "\n";
@@ -278,7 +282,7 @@ class GitRepo {
         head_file << hash;
     }
 
-    std::string read_hash_from_head(){
+    std::string read_hash_from_head() {
         std::ifstream head_file(git_path / "HEAD");
         if (!head_file.is_open()) {
             std::cerr << "Failed to open file!" << std::endl;
@@ -289,32 +293,70 @@ class GitRepo {
 
         return hash;
     }
+
+    void stage_file(fs::path file_path) {
+        fs::path abs_path = repo_path / file_path;
+        std::string hash = sha1_file(file_path);
+        // TODO: check if the file was modified or not
+        // to do this check the hash of the file in previous committer
+        // and compare with current hash
+        auto stat = fs::status(abs_path);
+        auto size = fs::file_size(abs_path);
+        auto mtime = fs::last_write_time(abs_path).time_since_epoch().count();
+
+        save_blob(file_path);
+
+        std::ofstream index_file(git_path / "index", std::ios::app);
+        index_file << hash << " " << file_path.string()
+                   << " "
+                   // << (stat.permissions() & fs::perms::owner_exec ? "100755" : "100644") << " "
+                   << size << " " << mtime << "\n";
+    }
+
+    void remove_staged_file(fs::path file_path) {
+        fs::path index_path = git_path / "index";
+        fs::path temp_path = git_path / "index.tmp";
+
+        std::ifstream in(index_path);
+        std::ofstream out(temp_path);
+
+        std::string line;
+        while (std::getline(in, line)) {
+            if (line.find(file_path.string()) == std::string::npos) {
+                out << line << "\n";
+            }
+        }
+
+        in.close();
+        out.close();
+
+        fs::rename(temp_path, index_path);
+    }
+    void save_index() {
+        std::ofstream index_file(git_path / "index");
+        index_file << index_content;
+        index_file.close();
+    }
 };
 
 class GitObject {
-    public:
+  public:
     std::string hash;
-    
-    GitObject(std::string content) {
-        this->hash = hash_object(content);
-    }
-    
+
+    GitObject(std::string content) { this->hash = hash_object(content); }
+
     // this class method will interact with fs to store any type of object in object store
     void save_object() {}
-    
-    private:
-    std::string hash_object(std::string content) {
-        return "avc";
-    }
+
+  private:
+    std::string hash_object(std::string content) { return "avc"; }
 };
 
 class GitBlob : public GitObject {
-public:
-    GitBlob(const std::string &filePath)
-        : GitObject(readFile(filePath))
-    {}
+  public:
+    GitBlob(const std::string &filePath) : GitObject(readFile(filePath)) {}
 
-private:
+  private:
     static std::string readFile(const std::string &filePath) {
         std::ifstream file(filePath, std::ios::binary);
         if (!file) {
@@ -327,17 +369,23 @@ private:
     }
 };
 
-class GitTree: public GitObject {
-    public:
+class GitTree : public GitObject {
+  public:
     // GitTree(fs::path dir_path): GitObject("asf") {
     //     // construct a buffer which has the content of the tree and send to parent constructor
     // }
-    
-    GitTree(std::string content): GitObject(content) {
-        save_object();
-    }
+
+    GitTree(std::string content) : GitObject(content) { save_object(); }
 };
 
+/*
+ * staging a file should
+ *  hash it
+ *  create blob obj
+ *  save blob obj
+ *  add the entry ie the file path and hash in index file
+ *  only file can be staged not directories
+ */
 
 // create a tree object
 
@@ -345,9 +393,11 @@ class GitTree: public GitObject {
 // save tree object
 
 int main() {
-    GitRepo repo("/home/apoorva/programming/aprt-git/test");
+    GitRepo repo("/home/rajeevt/github/aprt-git/test");
     std::cout << "---------------------------------------" << std::endl;
-    repo.commit("apoorvapendse", "rajeevtapadia", "Is this the real life\nIs this just fantasy");
+    // repo.commit("apoorvapendse", "rajeevtapadia", "Is this the real life\nIs this just fantasy");
+
+    repo.stage_file("README.txt");
 
     // std::cout<<sha1File("./README.md")<<std::endl;
     // std::cout << repo.get_hash_from_content("Hello world") << std::endl;
