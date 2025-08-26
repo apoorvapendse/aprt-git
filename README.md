@@ -6,6 +6,7 @@ Design Doc: https://app.eraser.io/workspace/51LJBr86c4kcQaaVYSAq?origin=share
 - [x] Hash tree to store in .git/objects/
 - [x] Hash commit to store in .git/objects
 - [ ] Implment staging area (index)
+- [ ] Implement get previous hash for a file from previous commit 
 - [ ] Implement branches (refs)
 - [ ] Implement tags
 - [ ] [Implement CLI interface](https://hackmd.io/@ML10QiX-T6uAH01BMEGq5w/S1tLMuv_eg)
