@@ -2,7 +2,9 @@
 #include <fstream>
 #include <iostream>
 #include <openssl/sha.h>
+#include <ostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -91,12 +93,12 @@ class GitRepo {
         std::cout << ".aprt-git repository initialized in " << git_path << std::endl;
     }
 
-    std::string sha1_file(const std::string &filePath) {
+    std::string sha1_file(const std::string &abs_file_path) {
         unsigned char hash[SHA_DIGEST_LENGTH];
         SHA_CTX shaCtx;
         SHA1_Init(&shaCtx);
 
-        std::ifstream file(filePath, std::ios::binary);
+        std::ifstream file(abs_file_path, std::ios::binary);
         std::vector<char> buffer(8192);
         while (file.good()) {
             file.read(buffer.data(), buffer.size());
@@ -111,8 +113,8 @@ class GitRepo {
         return oss.str();
     }
 
-    void save_blob(const std::string &file_path) {
-        std::string hash = sha1_file(file_path);
+    void save_blob(const std::string &abs_file_path) {
+        std::string hash = sha1_file(abs_file_path);
 
         std::string dir = git_path / "objects" / hash.substr(0, 2);
         std::string filename = hash.substr(2);
@@ -125,7 +127,7 @@ class GitRepo {
             return;
         }
 
-        std::ifstream src(file_path, std::ios::binary);
+        std::ifstream src(abs_file_path, std::ios::binary);
         std::ofstream dst(fullPath, std::ios::binary);
         // TODO: add compression
         dst << src.rdbuf();
@@ -151,6 +153,38 @@ class GitRepo {
         dst << content;
 
         std::cout << "Stored object: " << fullPath << "\n";
+    }
+
+    std::string get_file_content(std::string absolute_file_path){
+        std::ifstream inputFile(absolute_file_path);
+        if (!inputFile.is_open()) {
+            throw std::runtime_error("Error opening file: " + absolute_file_path + "\n");
+        }
+        
+        std::string file_content;
+        std::string currline;
+        while(std::getline(inputFile, currline)){
+            file_content += currline + "\n";
+        }
+        return file_content;
+    }
+
+    std::string read_object_content(std::string hash){
+        std::string dir = git_path / "objects" / hash.substr(0, 2);
+        std::string filename = hash.substr(2);
+
+        std::string fullPath = dir + "/" + filename;
+        if (!fs::exists(fullPath)) {
+            throw std::runtime_error("Object doesn't exist: " + fullPath + "\n");
+        }
+        
+        std::string object_content=get_file_content(fullPath);
+        return object_content;
+    }
+    
+    std::vector<std::string> get_immediate_children(std::string tree_hash){
+        tree_object_content = read_object_content(tree_hash);
+        
     }
 
     std::string hash_from_root(fs::path path = {}) {
@@ -261,7 +295,7 @@ class GitRepo {
         std::string commit_content = "";
         std::string parent_hash = read_hash_from_head();
         commit_content += "tree " + root_tree_hash + "\n";
-        if (parent_hash.size() != 0) {
+        if (parent_hash.size() != ) {
             commit_content += "parent " + parent_hash + "\n";
         }
         commit_content += "author " + author + "\n";
@@ -273,6 +307,7 @@ class GitRepo {
         // TODO: Save this commit_hash in HEAD. Think about interactive rebase 🤯
         write_commit_hash_to_head_file(commit_hash);
     }
+
     void write_commit_hash_to_head_file(std::string hash) {
         // TODO: Store ref when it is implemented instead of storing hash directly in HEAD
         std::ofstream head_file(git_path / "HEAD");
@@ -280,6 +315,13 @@ class GitRepo {
             throw std::runtime_error("could not open HEAD file");
         }
         head_file << hash;
+    }
+
+    std::string get_previous_commit_hash(){
+        // TODO: If HEAD contains ref, read from refs/heads/<branch-name> for commit hash
+        // Current assumption is HEAD will always contain the prrevious commit hash.
+
+       return read_hash_from_head();
     }
 
     std::string read_hash_from_head() {
@@ -294,20 +336,31 @@ class GitRepo {
         return hash;
     }
 
-    void stage_file(fs::path file_path) {
-        fs::path abs_path = repo_path / file_path;
-        std::string hash = sha1_file(file_path);
+    // Returns the hash of the file during previous commit.
+    // Will be used to decide whether a file was modifed since last commit.
+    std::string get_file_hash_for_commit(std::string commit_hash, std::string relative_file_path) {
+        // TODO: parse commit object file content into an memory class instance.
+        std::string commit_content = read_object_content(commit_hash);
+        
+    }
+
+    void stage_file(fs::path relative_file_path) {
+        fs::path abs_path = repo_path / relative_file_path;
+        std::string current_hash_for_blob = sha1_file(abs_path);
+        std::string previous_commit_hash = get_previous_commit_hash();
+        std::string previou_hash_for_blob = get_file_hash_for_commit(previous_commit_hash, relative_file_path);
+
         // TODO: check if the file was modified or not
-        // to do this check the hash of the file in previous committer
+        // to do this check the hash of the file in previous commit
         // and compare with current hash
         auto stat = fs::status(abs_path);
         auto size = fs::file_size(abs_path);
         auto mtime = fs::last_write_time(abs_path).time_since_epoch().count();
 
-        save_blob(file_path);
+        save_blob(abs_path);
 
         std::ofstream index_file(git_path / "index", std::ios::app);
-        index_file << hash << " " << file_path.string()
+        index_file << current_hash_for_blob << " " << relative_file_path.string()
                    << " "
                    // << (stat.permissions() & fs::perms::owner_exec ? "100755" : "100644") << " "
                    << size << " " << mtime << "\n";
@@ -392,10 +445,26 @@ class GitTree : public GitObject {
 // create recusively tree for each dir in repo
 // save tree object
 
+std::string get_base_path_from_config(){
+    std::ifstream file("config.aprt");
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open config.aprt" << std::endl;
+        exit(1);
+    }
+
+    std::string base_path;
+    if (std::getline(file, base_path)) {
+    } else {
+        std::cerr << "ERROR: config file is empty." << std::endl;
+        exit(1);
+    }
+    return base_path;
+}
+
 int main() {
-    GitRepo repo("/home/rajeevt/github/aprt-git/test");
+    GitRepo repo(get_base_path_from_config());
     std::cout << "---------------------------------------" << std::endl;
-    // repo.commit("apoorvapendse", "rajeevtapadia", "Is this the real life\nIs this just fantasy");
+    repo.commit("apoorvapendse", "rajeevtapadia", "Is this the real life\nIs this just fantasy");
 
     repo.stage_file("README.txt");
 
