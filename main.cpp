@@ -59,6 +59,28 @@ Entry generate_tree_entry(const fs::directory_entry &child, std::string entry_ha
     std::string name = child.path().filename().string();
     return Entry(perms, hash, type, name);
 }
+
+class CommitObject {
+  public:
+    std::string tree;
+    std::string author;
+    std::string committer;
+    std::string parent;
+};
+
+class TreeObject {
+  public:
+    std::vector<TreeEntry> children;
+};
+
+class TreeEntry{
+public:
+    int mode;
+    std::string type; // tree or blob
+    std::string hash;
+    std::string name;    
+};
+
 class GitRepo {
   public:
     fs::path repo_path;
@@ -155,21 +177,21 @@ class GitRepo {
         std::cout << "Stored object: " << fullPath << "\n";
     }
 
-    std::string get_file_content(std::string absolute_file_path){
+    std::string get_file_content(std::string absolute_file_path) {
         std::ifstream inputFile(absolute_file_path);
         if (!inputFile.is_open()) {
             throw std::runtime_error("Error opening file: " + absolute_file_path + "\n");
         }
-        
+
         std::string file_content;
         std::string currline;
-        while(std::getline(inputFile, currline)){
+        while (std::getline(inputFile, currline)) {
             file_content += currline + "\n";
         }
         return file_content;
     }
 
-    std::string read_object_content(std::string hash){
+    std::string read_object_content(std::string hash) {
         std::string dir = git_path / "objects" / hash.substr(0, 2);
         std::string filename = hash.substr(2);
 
@@ -177,14 +199,33 @@ class GitRepo {
         if (!fs::exists(fullPath)) {
             throw std::runtime_error("Object doesn't exist: " + fullPath + "\n");
         }
-        
-        std::string object_content=get_file_content(fullPath);
+
+        std::string object_content = get_file_content(fullPath);
         return object_content;
     }
-    
-    std::vector<std::string> get_immediate_children(std::string tree_hash){
+
+    CommitObject parse_commit_content(std::string content) {
+        CommitObject commit;
+
+        std::istringstream iss(content);
+        std::string line;
+        while (std::getline(iss, line)) {
+            if (line.rfind("tree ", 0) == 0) {
+                commit.tree = line.substr(5);
+            } else if (line.rfind("author ", 0) == 0) {
+                commit.author = line.substr(7);
+            } else if (line.rfind("committer ", 0) == 0) {
+                commit.committer = line.substr(10);
+            } else if (line.rfind("parent ", 0) == 0) {
+                commit.parent = line.substr(7);
+            }
+        }
+
+        return commit;       
+    }
+
+    std::vector<std::string> get_immediate_children(std::string tree_hash) {
         tree_object_content = read_object_content(tree_hash);
-        
     }
 
     std::string hash_from_root(fs::path path = {}) {
@@ -295,7 +336,7 @@ class GitRepo {
         std::string commit_content = "";
         std::string parent_hash = read_hash_from_head();
         commit_content += "tree " + root_tree_hash + "\n";
-        if (parent_hash.size() != ) {
+        if (parent_hash.size() !=) {
             commit_content += "parent " + parent_hash + "\n";
         }
         commit_content += "author " + author + "\n";
@@ -317,11 +358,11 @@ class GitRepo {
         head_file << hash;
     }
 
-    std::string get_previous_commit_hash(){
+    std::string get_previous_commit_hash() {
         // TODO: If HEAD contains ref, read from refs/heads/<branch-name> for commit hash
         // Current assumption is HEAD will always contain the prrevious commit hash.
 
-       return read_hash_from_head();
+        return read_hash_from_head();
     }
 
     std::string read_hash_from_head() {
@@ -341,7 +382,6 @@ class GitRepo {
     std::string get_file_hash_for_commit(std::string commit_hash, std::string relative_file_path) {
         // TODO: parse commit object file content into an memory class instance.
         std::string commit_content = read_object_content(commit_hash);
-        
     }
 
     void stage_file(fs::path relative_file_path) {
@@ -445,7 +485,7 @@ class GitTree : public GitObject {
 // create recusively tree for each dir in repo
 // save tree object
 
-std::string get_base_path_from_config(){
+std::string get_base_path_from_config() {
     std::ifstream file("config.aprt");
     if (!file.is_open()) {
         std::cerr << "Error: Could not open config.aprt" << std::endl;
