@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include<assert.h>
 
 namespace fs = std::filesystem;
 
@@ -19,17 +20,17 @@ class Entry {
         040000 tree 9e377827cb1253aadc6efba776fc29dd329a704f    test
     */
   public:
-    int perms;
+    std::string perms;
     std::string hash;
     std::string type;
     std::string name;
 
-    Entry(int perms, const std::string &hash, const std::string &type, const std::string &name)
+    Entry(const std::string &perms, const std::string &hash, const std::string &type, const std::string &name)
         : perms(perms), hash(hash), type(type), name(name) {}
 
     std::string toString() const {
         std::ostringstream ss;
-        ss << std::oct << perms << " "; // permissions in octal
+        ss << perms << " ";
         ss << type << " ";
         ss << hash << "\t";
         ss << name;
@@ -39,16 +40,16 @@ class Entry {
 
 // helper to generate entry content for a given child.
 Entry generate_tree_entry(const fs::directory_entry &child, std::string entry_hash) {
-    int perms;
+    std::string perms;
     std::string type;
     std::string hash;
 
     if (child.is_regular_file()) {
-        perms = 0100644; // typical blob file permissions
+        perms = "100644"; // typical blob file permissions
         type = "blob";
         hash = entry_hash;
     } else if (child.is_directory()) {
-        perms = 040000; // tree directory permissions in octal
+        perms = "040000"; // tree directory permissions in octal
         type = "tree";
         // For directories, compute tree hash recursively or placeholder
         hash = entry_hash; // replace with actual tree hash logic
@@ -70,15 +71,7 @@ class CommitObject {
 
 class TreeObject {
   public:
-    std::vector<TreeEntry> children;
-};
-
-class TreeEntry{
-public:
-    int mode;
-    std::string type; // tree or blob
-    std::string hash;
-    std::string name;    
+    std::vector<Entry> children;
 };
 
 class GitRepo {
@@ -219,13 +212,35 @@ class GitRepo {
             } else if (line.rfind("parent ", 0) == 0) {
                 commit.parent = line.substr(7);
             }
+            // TODO: Add commit message if required
         }
 
-        return commit;       
+        return commit;
     }
 
-    std::vector<std::string> get_immediate_children(std::string tree_hash) {
-        tree_object_content = read_object_content(tree_hash);
+    TreeObject parse_tree_content(std::string content) {
+        TreeObject tree_obj;
+        std::istringstream iss(content);
+        std::string line;
+        while (std::getline(iss, line)) {
+            std::string perms = line.substr(0, 6);
+            std::string type = line.substr(7, 4);
+            std::string hash = line.substr(12, 40);
+            std::string name = line.substr(53);
+            Entry e(perms, hash, type, name);
+            tree_obj.children.push_back(e);
+        }
+        return tree_obj;
+    }
+
+    // returns hashes of immediate children for a given tree
+    std::vector<std::string> get_immediate_children_hashes(std::string tree_hash) {
+        std::string tree_object_content = read_object_content(tree_hash);
+        TreeObject tree_obj = parse_tree_content(tree_object_content);
+        std::vector<std::string> children_hashes;
+        for (auto &child : tree_obj.children) {
+            children_hashes.push_back(child.hash);
+        }
     }
 
     std::string hash_from_root(fs::path path = {}) {
@@ -274,14 +289,14 @@ class GitRepo {
         for (const auto &e : entries) {
             if (e.type == "blob") {
                 std::string blob_entry = "";
-                blob_entry += std::to_string(e.perms) + " ";
+                blob_entry += e.perms + " ";
                 blob_entry += e.type + " ";
                 blob_entry += e.hash + " ";
                 blob_entry += e.name + "\n";
                 final_tree_object_content += blob_entry;
             } else {
                 std::string tree_entry = "";
-                tree_entry += std::to_string(e.perms) + " ";
+                tree_entry += e.perms + " ";
                 tree_entry += e.type + " ";
                 tree_entry += e.hash + " ";
                 tree_entry += e.name + "\n";
@@ -327,6 +342,9 @@ class GitRepo {
         Signed-off-by: apoorvapendse <apoorvavpendse@gmail.com>
     */
     void commit(std::string author, std::string committer, std::string commit_message) {
+        
+    // TODO: Current commit implementation runs an implicit `git add .`. Now the next task is only committing
+    // those blobs that were in index
         std::string root_tree_hash = hash_from_root();
         if (root_tree_hash == "nothing changed") {
             std::cout << "nothing to commit, working tree clean.";
@@ -336,9 +354,9 @@ class GitRepo {
         std::string commit_content = "";
         std::string parent_hash = read_hash_from_head();
         commit_content += "tree " + root_tree_hash + "\n";
-        if (parent_hash.size() !=) {
-            commit_content += "parent " + parent_hash + "\n";
-        }
+        // if (parent_hash.size() !=) {
+        //     commit_content += "parent " + parent_hash + "\n";
+        // }
         commit_content += "author " + author + "\n";
         commit_content += "committer " + committer + "\n\n";
         commit_content += commit_message;
@@ -377,26 +395,71 @@ class GitRepo {
         return hash;
     }
 
+    std::vector<std::string> split_by_slash(const std::string &str) {
+        std::vector<std::string> result;
+        std::string token;
+        
+        // Traverse the string and split by '/'
+        for (char ch : str) {
+            if (ch == '/') {
+                if (!token.empty()) {
+                    result.push_back(token);
+                    token.clear();
+                }
+            } else {
+                token += ch;
+            }
+        }
+        
+        // Add the last token if it's not empty
+        if (!token.empty()) {
+            result.push_back(token);
+        }
+    
+        return result;
+    }
+
+    std::string search_for_blob_hash_for_a_given_tree(TreeObject& root_tree_obj, const std::string& relative_path) {
+        std::vector<std::string> path_parts = split_by_slash(relative_path);
+        int n = path_parts.size();
+        for(int i = 0; i < n - 1; i++) {
+            for(auto child : root_tree_obj.children) {
+                if(child.name == path_parts[i]) {
+                    root_tree_obj = parse_tree_content(read_object_content(child.hash));
+                    break;
+                }
+            }
+        }
+        // We have to find the blob from current root_tree_obj now.
+
+        for(auto &child: root_tree_obj.children){
+            if(child.name == path_parts[n-1]) {
+                assert(child.type == "blob");
+                return child.hash;
+            }
+        }
+
+        return "new_blob";
+    }
+
     // Returns the hash of the file during previous commit.
     // Will be used to decide whether a file was modifed since last commit.
     std::string get_file_hash_for_commit(std::string commit_hash, std::string relative_file_path) {
         // TODO: parse commit object file content into an memory class instance.
         std::string commit_content = read_object_content(commit_hash);
+        CommitObject commit_object = parse_commit_content(commit_content);
+
+        std::string root_tree_content = read_object_content(commit_object.tree);
+        TreeObject root_tree_object = parse_tree_content(root_tree_content);
+        return search_for_blob_hash_for_a_given_tree(root_tree_object, relative_file_path);
     }
 
-    void stage_file(fs::path relative_file_path) {
-        fs::path abs_path = repo_path / relative_file_path;
-        std::string current_hash_for_blob = sha1_file(abs_path);
-        std::string previous_commit_hash = get_previous_commit_hash();
-        std::string previou_hash_for_blob = get_file_hash_for_commit(previous_commit_hash, relative_file_path);
-
-        // TODO: check if the file was modified or not
-        // to do this check the hash of the file in previous commit
-        // and compare with current hash
+    // Only meant to be called by maybe_stage_file
+    void stage_file(fs::path abs_path, fs::path relative_file_path){
         auto stat = fs::status(abs_path);
         auto size = fs::file_size(abs_path);
         auto mtime = fs::last_write_time(abs_path).time_since_epoch().count();
-
+        std::string current_hash_for_blob = sha1_file(abs_path);
         save_blob(abs_path);
 
         std::ofstream index_file(git_path / "index", std::ios::app);
@@ -404,6 +467,25 @@ class GitRepo {
                    << " "
                    // << (stat.permissions() & fs::perms::owner_exec ? "100755" : "100644") << " "
                    << size << " " << mtime << "\n";
+    }
+
+    void maybe_stage_file(fs::path relative_file_path) {
+        fs::path abs_path = repo_path / relative_file_path;
+        std::string previous_commit_hash = get_previous_commit_hash();
+        // TODO: check for duplicate entry in the index file by hash for a given blob
+        if(previous_commit_hash.empty()){
+            // no commits have been made so far, so stage this file.
+            std :: cout << "No prev commits detected, staging file blindly " << std::endl;
+            stage_file(abs_path, relative_file_path);return;
+        }
+        std::string current_hash_for_blob = sha1_file(abs_path);
+        std::string previous_hash_for_blob = get_file_hash_for_commit(previous_commit_hash, relative_file_path);
+
+        if(previous_hash_for_blob == current_hash_for_blob){
+            std::cout << "No changes detected in blob to stage:" << relative_file_path.string() << std::endl;
+        }; 
+
+        stage_file(abs_path, relative_file_path);
     }
 
     void remove_staged_file(fs::path file_path) {
@@ -503,12 +585,21 @@ std::string get_base_path_from_config() {
 
 int main() {
     GitRepo repo(get_base_path_from_config());
-    std::cout << "---------------------------------------" << std::endl;
-    repo.commit("apoorvapendse", "rajeevtapadia", "Is this the real life\nIs this just fantasy");
-
-    repo.stage_file("README.txt");
-
+    // std::cout << "---------------------------------------" << std::endl;
+    
+    // repo.stage_file("README.txt");
+    
     // std::cout<<sha1File("./README.md")<<std::endl;
     // std::cout << repo.get_hash_from_content("Hello world") << std::endl;
+    
+    // repo.parse_tree_content("100644 tree 1d7e200148f3b648f4af053c06777184d5328357 subdir\n040000 blob "
+    //                         "89d69a3b673d7d7d5ab7ebf2bbd88d994b1cc633 README.txt");
+    // repo.maybe_stage_file("README.txt");
+    // repo.maybe_stage_file("lavda");
+    // repo.maybe_stage_file("laugh");
+
+    // repo.commit("apoorvapendse", "rajeevtapadia", "Is this the real life\nIs this just fantasy");
+    repo.maybe_stage_file("README.txt");
+
     return 0;
 }
