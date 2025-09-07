@@ -5,8 +5,8 @@ Design Doc: https://app.eraser.io/workspace/51LJBr86c4kcQaaVYSAq?origin=share
 - [x] Hash blob to store in .git/objects/
 - [x] Hash tree to store in .git/objects/
 - [x] Hash commit to store in .git/objects
-- [ ] Implment staging area (index)
-- [ ] Implement get previous hash for a file from previous commit
+- [x] Implment staging area (index)
+- [x] Implement get previous hash for a file from previous commit
 - [ ] Implement branches (refs)
 - [ ] Implement tags
 - [ ] Implement stash
