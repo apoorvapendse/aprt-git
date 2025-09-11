@@ -306,17 +306,42 @@ class GitRepo {
                 Entry dir_entry = generate_tree_entry(entry, dir_hash);
                 entries.push_back(dir_entry);
             } else if (entry.is_regular_file()) {
-                std::ifstream file(entry.path(), std::ios::binary);
-                std::ostringstream ss;
-                ss << file.rdbuf();
-                std::string content = ss.str();
 
-                std::string file_hash = get_hash_from_content(content);
-                if (check_hash_exists_already(file_hash)) {
-                    continue;
+                // Only commit staged blobs with their staged hashes from index
+                // If a blob is not staged, use get_file_hash_for_commit to get its previous hash
+                // and simply return this.
+
+                // Relative path upto this file.
+                fs::path rel = fs::relative(entry.path(), repo_path);
+                std::string path_to_check = rel.string();
+                // TODO: Ensure path_to_check is present in `index` before generating entry for latest hash
+                IndexObject index_obj = parse_index_file();
+                bool current_file_is_staged = false;
+                std::string file_hash; 
+                for(auto &entry: index_obj.entries){
+                    if(entry.relative_path == path_to_check) {
+                        current_file_is_staged = true;
+                        file_hash = entry.hash;
+                        break;
+                    }
                 }
-                std::cout << "Saving blob:" << entry.path() << std::endl;
-                save_blob(entry.path());
+                if(!current_file_is_staged) {
+                    std::string prev_commit_hash = get_previous_commit_hash();
+                    if(prev_commit_hash.empty()) {
+                        // Meaning we are creating the first commit and this file wasn't staged
+                        // Avoid adding this as a new entry in the current tree
+                        continue;
+                    }
+                    file_hash = get_file_hash_for_commit(prev_commit_hash, path_to_check);
+                    if(file_hash == "new_blob") {
+                        // Meaning this file was added in this commit and is not staged
+                        // Avoid adding this as a new entry in the current tree
+                        continue;
+                    }
+                }
+
+                // Either file_hash will come from prev commit in case it isn't staged, or it will come from index, 
+                // where path_to_check is the relative path mapped with the staged version of the file.
                 Entry file_entry = generate_tree_entry(entry, file_hash);
                 entries.push_back(file_entry);
             }
@@ -406,6 +431,8 @@ class GitRepo {
         std::string commit_hash = get_hash_from_content(commit_content);
         // TODO: Save this commit_hash in HEAD. Think about interactive rebase 🤯
         write_commit_hash_to_head_file(commit_hash);
+
+        clear_index_file();
     }
 
     void write_commit_hash_to_head_file(std::string hash) {
@@ -530,6 +557,17 @@ class GitRepo {
 
         outfile.close();
     };
+    
+    void clear_index_file(){
+        std::ofstream outfile(this->git_path / "index");
+        if (!outfile) {
+            std::cerr << "Error opening index file for writing." << std::endl;
+            return;
+        }
+        // This will overwrite
+        outfile << "";
+        outfile.close();
+    }
 
     void add_entry_to_index(IndexObject &index, fs::path abs_path, IndexEntry new_entry) {
         bool exists = false;
@@ -646,8 +684,9 @@ int main() {
     // repo.maybe_stage_file("lavda");
     // repo.maybe_stage_file("laugh");
 
-    // repo.commit("apoorvapendse", "rajeevtapadia", "Is this the real life\nIs this just fantasy");
-    repo.maybe_stage_file("subdir/gg.txt");
-
+    // repo.maybe_stage_file("subdir/gg.txt");
+    // repo.commit("apoorvapendse", "rajeevtapadia", "1st commit");
+    // repo.maybe_stage_file("README.txt");
+    repo.commit("apoorvapendse", "rajeevtapadia", "2nd commit");
     return 0;
 }

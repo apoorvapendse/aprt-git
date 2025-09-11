@@ -7,6 +7,10 @@ Design Doc: https://app.eraser.io/workspace/51LJBr86c4kcQaaVYSAq?origin=share
 - [x] Hash commit to store in .git/objects
 - [x] Implment staging area (index)
 - [x] Implement get previous hash for a file from previous commit
+- [x] Only commit staged files
+      When calling `commit`, read from `index` and only commit those files.
+- [ ] Split implementations in different files (UPCOMING)
+- [ ] something like git log 
 - [ ] Implement branches (refs)
 - [ ] Implement tags
 - [ ] Implement stash
