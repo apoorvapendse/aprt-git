@@ -601,45 +601,6 @@ class GitRepo {
     }
 };
 
-class GitObject {
-  public:
-    std::string hash;
-
-    GitObject(std::string content) { this->hash = hash_object(content); }
-
-    // this class method will interact with fs to store any type of object in object store
-    void save_object() {}
-
-  private:
-    std::string hash_object(std::string content) { return "avc"; }
-};
-
-class GitBlob : public GitObject {
-  public:
-    GitBlob(const std::string &filePath) : GitObject(readFile(filePath)) {}
-
-  private:
-    static std::string readFile(const std::string &filePath) {
-        std::ifstream file(filePath, std::ios::binary);
-        if (!file) {
-            throw std::runtime_error("Cannot open file: " + filePath);
-        }
-
-        std::ostringstream ss;
-        ss << file.rdbuf();
-        return ss.str();
-    }
-};
-
-class GitTree : public GitObject {
-  public:
-    // GitTree(fs::path dir_path): GitObject("asf") {
-    //     // construct a buffer which has the content of the tree and send to parent constructor
-    // }
-
-    GitTree(std::string content) : GitObject(content) { save_object(); }
-};
-
 /*
  * staging a file should
  *  hash it
