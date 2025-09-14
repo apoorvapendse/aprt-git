@@ -1,13 +1,13 @@
 #include "core.hpp"
 
-
-std::string GitRepo::search_for_blob_hash_for_a_given_tree(TreeObject &root_tree_obj, const std::string &relative_path) {
+std::string GitRepo::search_for_blob_hash_for_a_given_tree(TreeObject &root_tree_obj,
+                                                           const std::string &relative_path) {
     std::vector<std::string> path_parts = split_by_delimitor(relative_path, get_path_seperator());
     int n = path_parts.size();
     for (int i = 0; i < n - 1; i++) {
         for (auto child : root_tree_obj.children) {
             if (child.name == path_parts[i]) {
-                root_tree_obj = parse_tree_content(read_object_content(child.hash));
+                root_tree_obj = TreeObject::parse_tree_content(read_object_content(child.hash));
                 break;
             }
         }
@@ -24,8 +24,7 @@ std::string GitRepo::search_for_blob_hash_for_a_given_tree(TreeObject &root_tree
     return "new_blob";
 }
 
-
-TreeObject GitRepo::parse_tree_content(std::string content) {
+TreeObject TreeObject::parse_tree_content(std::string content) {
     TreeObject tree_obj;
     std::istringstream iss(content);
     std::string line;
@@ -66,12 +65,21 @@ Entry Entry::generate_tree_entry(const fs::directory_entry &child, std::string e
 // returns hashes of immediate children for a given tree
 std::vector<std::string> GitRepo::get_immediate_children_hashes(std::string tree_hash) {
     std::string tree_object_content = read_object_content(tree_hash);
-    TreeObject tree_obj = parse_tree_content(tree_object_content);
+    TreeObject tree_obj = TreeObject::parse_tree_content(tree_object_content);
     std::vector<std::string> children_hashes;
     for (auto &child : tree_obj.children) {
         children_hashes.push_back(child.hash);
     }
 }
 
+Entry::Entry(const std::string &perms, const std::string &hash, const std::string &type, const std::string &name)
+    : perms(perms), hash(hash), type(type), name(name) {}
 
-
+std::string Entry::toString() const {
+    std::ostringstream ss;
+    ss << perms << " ";
+    ss << type << " ";
+    ss << hash << "\t";
+    ss << name;
+    return ss.str();
+}

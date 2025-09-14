@@ -1,4 +1,5 @@
-#include <core.hpp>
+#include "core.hpp"
+
 void GitRepo::commit(std::string author, std::string committer, std::string commit_message) {
     // TODO: Current commit implementation runs an implicit `git add .`. Now the next task is only committing
     // those blobs that were in index
@@ -26,7 +27,7 @@ void GitRepo::commit(std::string author, std::string committer, std::string comm
     clear_index_file();
 }
 
-std::string GitRepo::hash_from_root(fs::path path = {}) {
+std::string GitRepo::hash_from_root(fs::path path) {
     if (path.empty()) {
         path = this->repo_path;
     }
@@ -120,7 +121,7 @@ std::string GitRepo::hash_from_root(fs::path path = {}) {
     return get_hash_from_content(final_tree_object_content);
 }
 
-CommitObject GitRepo::parse_commit_content(std::string content) {
+CommitObject CommitObject::parse_commit_content(std::string content) {
     CommitObject commit;
 
     std::istringstream iss(content);
@@ -173,9 +174,10 @@ std::string GitRepo::read_hash_from_head() {
 // Will be used to decide whether a file was modifed since last commit.
 std::string GitRepo::get_file_hash_for_commit(std::string commit_hash, std::string relative_file_path) {
     std::string commit_content = read_object_content(commit_hash);
-    CommitObject commit_object = parse_commit_content(commit_content);
+    CommitObject commit_object = CommitObject::parse_commit_content(commit_content);
 
     std::string root_tree_content = read_object_content(commit_object.tree);
-    TreeObject root_tree_object = parse_tree_content(root_tree_content);
+    TreeObject root_tree_object = TreeObject::parse_tree_content(root_tree_content);
     return search_for_blob_hash_for_a_given_tree(root_tree_object, relative_file_path);
 }
+

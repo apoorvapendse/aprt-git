@@ -7,16 +7,25 @@ CXXFLAGS = -ggdb -Wall
 # Libraries
 LIBS = -lssl -lcrypto
 
-# Source and output
-SRC = main.cpp
-OUT = a.out
+# Sources, objects, and output
+SRC = $(wildcard *.cpp)
+OBJ = $(patsubst %.cpp, build/%.o, $(SRC))
+OUT = build/a.out
 
 # Default target
 all: $(OUT)
 
-# Build rule
-$(OUT): $(SRC)
-	$(CXX) $(CXXFLAGS) $(SRC) $(LIBS) -o $(OUT)
+# Link step
+$(OUT): $(OBJ)
+	$(CXX) $(CXXFLAGS) $(OBJ) $(LIBS) -o $(OUT)
+
+# Compile step
+build/%.o: %.cpp | build
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Ensure build dir exists
+build:
+	mkdir -p build
 
 # Run target
 run: $(OUT)
@@ -24,9 +33,8 @@ run: $(OUT)
 
 # Clean target
 clean:
-	rm -f $(OUT)
+	rm -rf build
 
-
-# TODO: add a target that cleans test dir .git
+# Custom clean target for test dir
 clean_objects:
 	rm -rf ./test/.aprt-git
