@@ -95,6 +95,8 @@ class GitRepo {
     std::vector<std::string> get_immediate_children_hashes(std::string tree_hash);
 };
 
+extern GitRepo repo;
+
 std::string get_base_path_from_config();
 std::string sha1_file(const std::string &abs_file_path);
 std::string get_file_content(std::string absolute_file_path);

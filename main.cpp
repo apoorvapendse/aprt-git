@@ -6,6 +6,7 @@
 #include <string>
 
 #include "core.hpp"
+GitRepo repo;
 
 std::string get_base_path_from_config() {
     std::ifstream file("config.aprt");
@@ -24,7 +25,7 @@ std::string get_base_path_from_config() {
 }
 
 int main() {
-    GitRepo repo(get_base_path_from_config());
+    repo = GitRepo(get_base_path_from_config());
     // std::cout << "---------------------------------------" << std::endl;
 
     // repo.stage_file("README.txt");
