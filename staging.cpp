@@ -98,6 +98,7 @@ void GitRepo::maybe_stage_file(fs::path relative_file_path) {
 
     if (previous_hash_for_blob == current_hash_for_blob) {
         std::cout << "No changes detected in blob to stage:" << relative_file_path.string() << std::endl;
+        return;
     };
 
     stage_file(abs_path, relative_file_path);
