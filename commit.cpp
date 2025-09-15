@@ -12,9 +12,9 @@ void GitRepo::commit(std::string author, std::string committer, std::string comm
     std::string commit_content = "";
     std::string parent_hash = read_hash_from_head();
     commit_content += "tree " + root_tree_hash + "\n";
-    // if (parent_hash.size() !=) {
-    //     commit_content += "parent " + parent_hash + "\n";
-    // }
+    if (!parent_hash.empty()) {
+        commit_content += "parent " + parent_hash + "\n";
+    }
     commit_content += "author " + author + "\n";
     commit_content += "committer " + committer + "\n\n";
     commit_content += commit_message;
