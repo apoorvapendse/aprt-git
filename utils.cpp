@@ -58,3 +58,19 @@ std::string GitRepo::read_object_content(std::string hash) {
     std::string object_content = get_file_content(fullPath);
     return object_content;
 }
+
+
+void show_in_pager(const std::string& text) {
+    FILE* pager = popen("less", "w");
+    if (!pager) {
+        std::cerr << "Failed to open pager" << std::endl;
+        return;
+    }
+
+    // Write string to pager
+    fwrite(text.c_str(), 1, text.size(), pager);
+
+    // Close pager
+    pclose(pager);
+}
+    

@@ -82,3 +82,22 @@ bool GitRepo::check_hash_exists_already(std::string hash) {
     return fs::exists(object_path);
 }
 
+void print_git_log(){
+
+    // TODO: Show branches/tags when support is added for those.
+    std::string last_commit_hash = repo.get_previous_commit_hash();
+    if(last_commit_hash.empty()){
+        std::cout << "No commits found" << std::endl;
+        return;
+    }
+    std::string git_log_content;
+    while(!last_commit_hash.empty()) {
+        std::string curr_commit_content = repo.read_object_content(last_commit_hash);
+        CommitObject curr_commit_object = CommitObject::parse_commit_content(curr_commit_content);
+        git_log_content += "commit: " + last_commit_hash + "\n";
+        git_log_content += curr_commit_content + "\n";
+        git_log_content += "----------------------------------------------------------\n";
+        last_commit_hash = curr_commit_object.parent;
+    }
+    show_in_pager(git_log_content);
+}

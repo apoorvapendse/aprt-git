@@ -9,9 +9,9 @@ Design Doc: https://app.eraser.io/workspace/51LJBr86c4kcQaaVYSAq?origin=share
 - [x] Implement get previous hash for a file from previous commit
 - [x] Only commit staged files
       When calling `commit`, read from `index` and only commit those files.
-- [ ] Split implementations in different files (UPCOMING)
-- [ ] something like git log 
-- [ ] Implement branches (refs)
+- [x] Split implementations in different files 
+- [x] something like `git log` 
+- [ ] Implement branches (refs) **(UPCOMING)**
 - [ ] Implement tags
 - [ ] Implement stash
 - [ ] Implement `checkout`, just change HEAD to some ref/commit_hash

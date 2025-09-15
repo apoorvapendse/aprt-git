@@ -42,7 +42,8 @@ int main() {
     // repo.maybe_stage_file("subdir/gg.txt");
     // repo.commit("apoorvapendse", "rajeevtapadia", "1st commit");
     // repo.maybe_stage_file("README.txt");
-    repo.commit("apoorvapendse", "rajeevtapadia", "2nd commit");
+    // repo.commit("apoorvapendse", "rajeevtapadia", "two commit");
+    print_git_log();
     return 0;
 }
 

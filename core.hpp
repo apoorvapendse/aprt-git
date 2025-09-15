@@ -104,4 +104,7 @@ std::string get_hash_from_content(std::string content);
 std::vector<std::string> split_by_delimitor(const std::string &str, char delim);
 char get_path_seperator();
 
+// CLI utils
+void print_git_log();
+void show_in_pager(const std::string& text);
 #endif
