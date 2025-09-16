@@ -41,9 +41,9 @@ int main() {
 
     // repo.maybe_stage_file("subdir/gg.txt");
     // repo.commit("apoorvapendse", "rajeevtapadia", "1st commit");
-    // repo.maybe_stage_file("README.txt");
-    // repo.commit("apoorvapendse", "rajeevtapadia", "two commit");
-    print_git_log();
+    repo.maybe_stage_file("README.txt");
+    repo.commit("apoorvapendse", "rajeevtapadia", "two commit");
+    std::cout << "resolved commits hash: " << repo.read_hash_from_head() << std::endl;
+    std::cout << "content of HEAD: " << get_file_content_in_git("HEAD") << std::endl;
     return 0;
 }
-

@@ -14,6 +14,7 @@ GitRepo::GitRepo(const std::string &basePath) {
 
     // Create subdirectories
     fs::create_directories(git_path / "objects");
+    // local branches are stored in heads dir
     fs::create_directories(git_path / "refs" / "heads");
     fs::create_directories(git_path / "refs" / "tags");
 
@@ -28,7 +29,8 @@ GitRepo::GitRepo(const std::string &basePath) {
         indexFile << "";
     }
 
-    // TODO: load index file into string index_content
+    create_branch("master");
+    switch_branch("master");
 
     std::cout << ".aprt-git repository initialized in " << git_path << std::endl;
 }

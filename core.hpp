@@ -93,6 +93,9 @@ class GitRepo {
     void remove_staged_file(fs::path file_path);
     void save_index();
     std::vector<std::string> get_immediate_children_hashes(std::string tree_hash);
+    void create_branch(std::string branch_name, std::string commit_hash = "");
+    std::string get_current_branch_name();
+    void switch_branch(std::string branch_name);
 };
 
 extern GitRepo repo;
@@ -103,6 +106,9 @@ std::string get_file_content(std::string absolute_file_path);
 std::string get_hash_from_content(std::string content);
 std::vector<std::string> split_by_delimitor(const std::string &str, char delim);
 char get_path_seperator();
+void create_file_in_git(std::string file_path);
+void write_to_file_in_git(std::string file_path, std::string content);
+std::string get_file_content_in_git(std::string file_path);
 
 // CLI utils
 void print_git_log();
