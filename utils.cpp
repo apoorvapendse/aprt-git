@@ -1,4 +1,6 @@
 #include "core.hpp"
+#include <algorithm>
+#include <filesystem>
 
 std::vector<std::string> split_by_delimitor(const std::string &str, char delim) {
     std::vector<std::string> result;
@@ -33,16 +35,22 @@ char get_path_seperator() {
 }
 
 std::string get_file_content(std::string absolute_file_path) {
-    std::ifstream inputFile(absolute_file_path);
+    std::ifstream inputFile(absolute_file_path, std::ios::binary);
     if (!inputFile.is_open()) {
-        throw std::runtime_error("Error opening file: " + absolute_file_path + "\n");
+        throw std::runtime_error("Error opening file: " + absolute_file_path);
     }
 
-    std::string file_content;
-    std::string currline;
-    while (std::getline(inputFile, currline)) {
-        file_content += currline + "\n";
+    // seek to end to get size
+    inputFile.seekg(0, std::ios::end);
+    std::streamsize size = inputFile.tellg();
+    inputFile.seekg(0, std::ios::beg);
+
+    std::string file_content(size, '\0');
+
+    if (!inputFile.read(&file_content[0], size)) {
+        throw std::runtime_error("Error reading file: " + absolute_file_path);
     }
+
     return file_content;
 }
 
@@ -59,9 +67,8 @@ std::string GitRepo::read_object_content(std::string hash) {
     return object_content;
 }
 
-
-void show_in_pager(const std::string& text) {
-    FILE* pager = popen("less", "w");
+void show_in_pager(const std::string &text) {
+    FILE *pager = popen("less", "w");
     if (!pager) {
         std::cerr << "Failed to open pager" << std::endl;
         return;
