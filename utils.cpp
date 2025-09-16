@@ -80,4 +80,38 @@ void show_in_pager(const std::string &text) {
     // Close pager
     pclose(pager);
 }
-    
+
+void create_file_in_git(std::string file_path) {
+    fs::path full_path = repo.git_path / file_path;
+    fs::path parent_dir = full_path.parent_path();
+    assert(fs::exists(parent_dir));
+
+    std::ofstream file(full_path);
+    if (!file.is_open()) {
+        std::cerr << "Failed to create file: " << full_path << std::endl;
+        return;
+    }
+
+    file << "";
+    file.close();
+}
+
+void write_to_file_in_git(std::string file_path, std::string content) {
+    fs::path full_path = repo.git_path / file_path;
+    fs::path parent_dir = full_path.parent_path();
+    assert(fs::exists(parent_dir));
+
+    std::ofstream file(full_path);
+    if (!file.is_open()) {
+        std::cerr << "Failed to create file: " << full_path << std::endl;
+        return;
+    }
+
+    file << content;
+    file.close();
+}
+
+std::string get_file_content_in_git(std::string file_path) {
+    fs::path full_path = repo.git_path / file_path;
+    return get_file_content(full_path);
+}
