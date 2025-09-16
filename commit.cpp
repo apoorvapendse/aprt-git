@@ -1,11 +1,15 @@
 #include "core.hpp"
+#include <cassert>
+#include <ostream>
+#include <string>
+#include <vector>
 
 void GitRepo::commit(std::string author, std::string committer, std::string commit_message) {
     // TODO: Current commit implementation runs an implicit `git add .`. Now the next task is only committing
     // those blobs that were in index
     std::string root_tree_hash = hash_from_root();
     if (root_tree_hash == "nothing changed") {
-        std::cout << "nothing to commit, working tree clean.";
+        std::cout << "nothing to commit, working tree clean." << std::endl;
         return;
     }
 
@@ -21,8 +25,8 @@ void GitRepo::commit(std::string author, std::string committer, std::string comm
 
     save_hash_from_content(commit_content);
     std::string commit_hash = get_hash_from_content(commit_content);
-    // TODO: Save this commit_hash in HEAD. Think about interactive rebase 🤯
-    write_commit_hash_to_head_file(commit_hash);
+    std::string branch_name = get_current_branch_name();
+    write_to_file_in_git("refs/heads/" + branch_name, commit_hash);
 
     clear_index_file();
 }
@@ -60,30 +64,30 @@ std::string GitRepo::hash_from_root(fs::path path) {
             // TODO: Ensure path_to_check is present in `index` before generating entry for latest hash
             IndexObject index_obj = parse_index_file();
             bool current_file_is_staged = false;
-            std::string file_hash; 
-            for(auto &entry: index_obj.entries){
-                if(entry.relative_path == path_to_check) {
+            std::string file_hash;
+            for (auto &entry : index_obj.entries) {
+                if (entry.relative_path == path_to_check) {
                     current_file_is_staged = true;
                     file_hash = entry.hash;
                     break;
                 }
             }
-            if(!current_file_is_staged) {
+            if (!current_file_is_staged) {
                 std::string prev_commit_hash = get_previous_commit_hash();
-                if(prev_commit_hash.empty()) {
+                if (prev_commit_hash.empty()) {
                     // Meaning we are creating the first commit and this file wasn't staged
                     // Avoid adding this as a new entry in the current tree
                     continue;
                 }
                 file_hash = get_file_hash_for_commit(prev_commit_hash, path_to_check);
-                if(file_hash == "new_blob") {
+                if (file_hash == "new_blob") {
                     // Meaning this file was added in this commit and is not staged
                     // Avoid adding this as a new entry in the current tree
                     continue;
                 }
             }
 
-            // Either file_hash will come from prev commit in case it isn't staged, or it will come from index, 
+            // Either file_hash will come from prev commit in case it isn't staged, or it will come from index,
             // where path_to_check is the relative path mapped with the staged version of the file.
             Entry file_entry = Entry::generate_tree_entry(entry, file_hash);
             entries.push_back(file_entry);
@@ -151,22 +155,44 @@ void GitRepo::write_commit_hash_to_head_file(std::string hash) {
     head_file << hash;
 }
 
-std::string GitRepo::get_previous_commit_hash() {
-    // TODO: If HEAD contains ref, read from refs/heads/<branch-name> for commit hash
-    // Current assumption is HEAD will always contain the prrevious commit hash.
+std::string GitRepo::get_previous_commit_hash() { return read_hash_from_head(); }
 
-    return read_hash_from_head();
-}
-
+/*
+ * This function resolved the content of HEAD and return the hash.
+ *
+ * If we are in detached state HEAD file directly contains the hash
+ * else it contains a ref in the following format
+ * ref: refs/heads/main
+ */
 std::string GitRepo::read_hash_from_head() {
     std::ifstream head_file(git_path / "HEAD");
     if (!head_file.is_open()) {
         std::cerr << "Failed to open file!" << std::endl;
         return "";
     }
-    std::string hash;
-    std::getline(head_file, hash);
 
+    std::string head_content;
+    std::getline(head_file, head_content);
+    if (head_content.size() == 0) {
+        return head_content;
+    }
+
+    std::string hash;
+
+    std::string prefix = "ref:";
+    if (head_content.compare(0, prefix.size(), prefix) == 0) {
+        // resolve branch_name in attached state
+        std::string branch_name = get_current_branch_name();
+
+        hash = get_file_content_in_git("refs/heads/" + branch_name);
+        assert(hash.size() == 40 || hash.size() == 0);
+        return hash;
+    }
+
+    // we are in detached state
+    hash = head_content;
+    // TODO: investigate why hash size is 41 in branch file but 40 in head file
+    assert(hash.size() == 40);
     return hash;
 }
 
@@ -180,4 +206,3 @@ std::string GitRepo::get_file_hash_for_commit(std::string commit_hash, std::stri
     TreeObject root_tree_object = TreeObject::parse_tree_content(root_tree_content);
     return search_for_blob_hash_for_a_given_tree(root_tree_object, relative_file_path);
 }
-
