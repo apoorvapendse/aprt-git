@@ -11,9 +11,10 @@ Design Doc: https://app.eraser.io/workspace/51LJBr86c4kcQaaVYSAq?origin=share
       When calling `commit`, read from `index` and only commit those files.
 - [x] Split implementations in different files 
 - [x] something like `git log` 
-- [ ] Implement branches (refs) **(UPCOMING)**
+- [x] Implement branches (refs) 
+- [ ] Implement stash **(UPCOMING)**
+- [ ] Implment rebase
 - [ ] Implement tags
-- [ ] Implement stash
 - [ ] Implement `checkout`, just change HEAD to some ref/commit_hash
 - [ ] [Implement CLI interface](https://hackmd.io/@ML10QiX-T6uAH01BMEGq5w/S1tLMuv_eg)
 - [ ] Added support for detached state (HEAD file contains hash of commit directly)
